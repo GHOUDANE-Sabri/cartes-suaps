@@ -24,7 +24,7 @@
   <style>
     :root{
       --ink:#0f2b2e;--ink-soft:#4d6266;--line:#dfe6e4;--paper:#fff;--wash:#f3f6f4;
-      --sport:#007a63;--sport-wash:#e2f2ed;--campus:#1d5fa7;--campus-wash:#e4edf7;--signal:#ffc42e;
+      --sport:#007a63;--sport-wash:#e2f2ed;--campus:#1d5fa7;--campus-wash:#e4edf7;--signal:#ffc42e;--alert:#b3261e;--alert-wash:#fcebea;
       --display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;--body:Barlow,Arial,sans-serif;
     }
     *{box-sizing:border-box}
@@ -69,6 +69,13 @@
     .place-sub{display:block;margin-top:2px;font-size:13px;line-height:1.3;color:var(--ink-soft)}
     .modes{display:flex;gap:5px;color:var(--ink-soft)}
     .bonus{padding:2px 7px;border-radius:4px;background:var(--campus);color:#fff;font-size:12px;font-weight:600;white-space:nowrap}
+    .bonus.off{background:var(--alert)}
+    .bonus.moved{background:var(--signal);color:var(--ink)}
+    .place.cancelled .place-title{text-decoration:line-through;color:var(--ink-soft)}
+    .notice{margin:12px 22px 4px;padding:11px 13px;border-left:4px solid var(--alert);border-radius:6px;background:var(--alert-wash);font-size:14px;line-height:1.4}
+    .notice strong{display:block;margin-bottom:2px;color:var(--alert)}
+    .notice button{margin-top:4px;padding:0;border:0;background:none;color:var(--ink);font-weight:600;text-decoration:underline}
+    .detail-body .notice{margin:16px 0 0}
     .others{display:grid;gap:0}
     .others .place{padding:9px 0;grid-template-columns:1fr auto}
     .empty{margin:0;padding:28px 22px;color:var(--ink-soft)}
@@ -164,6 +171,7 @@
         </div>
         <div class="scroll" id="listScroll">
           <p class="sr-only" id="count" role="status"></p>
+          <div class="notice" id="poolNotice"><strong>Piscine du Parvis fermée</strong>Les cours de natation sont annulés, sauf « Apprendre à nager » du vendredi 15h45–16h45, déplacé à la piscine de l’Axe Majeur.<br><button type="button" id="poolMoved">Voir le cours déplacé</button></div>
           <div id="lists"></div>
         </div>
       </section>
@@ -195,7 +203,8 @@ const places=[
  {n:'CY',name:'CY Cergy Paris Université — Site des Chênes',address:'33 boulevard du Port, 95011 Cergy-Pontoise',lat:49.039683,lng:2.075183,type:'university',bus:'Point de départ'},
  {n:'CY',name:'CY Cergy Paris Université — Site de Saint-Martin',address:'2 avenue Adolphe-Chauvin, 95300 Pontoise',lat:49.0428,lng:2.08424,type:'university',bus:'Arrêt Plateau Saint-Martin — lignes 1230, 1236'},
  {n:'CY',name:'CY Cergy Paris Université — Site de Neuville-sur-Oise',address:'5 mail Gay-Lussac, 95000 Neuville-sur-Oise',lat:49.0168626,lng:2.0745323,type:'university',hideAccessInfo:true},
- {n:14,name:'Climb Up Épinay',address:'8 rue Henri Wallon, 93800 Épinay-sur-Seine',lat:48.953824,lng:2.3219625,noRoutes:true,hideAccessInfo:true,far:true}
+ {n:14,name:'Climb Up Épinay',address:'8 rue Henri Wallon, 93800 Épinay-sur-Seine',lat:48.953824,lng:2.3219625,noRoutes:true,hideAccessInfo:true,far:true},
+ {n:15,name:'Piscine de l’Axe Majeur',address:'13 avenue du Jour, 95800 Cergy',lat:49.0453015,lng:2.029827,hideAccessInfo:true}
 ];
 // Affichage : titre court, sous-titre et catégorie, par position dans places
 const display=[
@@ -215,12 +224,16 @@ const display=[
  {title:'Site des Chênes',sub:'CY Cergy Paris Université'},
  {title:'Site de Saint-Martin',sub:'CY Cergy Paris Université'},
  {title:'Site de Neuville-sur-Oise',sub:'CY Cergy Paris Université'},
- {title:'Climb Up Épinay'}
+ {title:'Climb Up Épinay'},
+ {title:'Piscine de l’Axe Majeur',cat:'eau'}
 ];
+// Annonce en cours : fermeture de la Piscine du Parvis
+display[2].alert='Piscine fermée : les cours de natation sont annulés. « Apprendre à nager » du vendredi est déplacé à la piscine de l’Axe Majeur.';
 const days={lun:'Lundi',mar:'Mardi',mer:'Mercredi',jeu:'Jeudi',ven:'Vendredi',sam:'Samedi'};
 const cats={collectif:'Collectifs',raquette:'Raquette',eau:'Aquatiques',combat:'Combat',bienetre:'Bien-être',gym:'Gymniques',art:'Artistiques',forme:'Forme',nature:'Pleine nature'};
 // Lieux du planning, par position dans places
-const CSU=0,CHENES=1,PISCINE=2,MARADAS=3,ESSEC=4,HEMET=5,BLOCKOUT=6,GOLF=7,TENNIS=8,CLIMBUP=16;
+const CSU=0,CHENES=1,PISCINE=2,MARADAS=3,ESSEC=4,HEMET=5,BLOCKOUT=6,GOLF=7,TENNIS=8,CLIMBUP=16,AXE=17;
+const OFF={cancelled:true};
 const B={bonus:true};
 // Planning SUAPS 2026-2027 : [jour, début, fin, cours, lieu, salle, catégorie, options]
 const planning=[
@@ -248,7 +261,7 @@ const planning=[
  ['mar','12h','13h30','Futsal',CHENES,'','collectif'],
  ['mar','12h','19h','Musculation',CSU,'Musculation','forme',{sub:'En accès libre'}],
  ['mar','12h30','13h30','Cardio training',CSU,'Salle de danse','forme'],
- ['mar','12h45','13h45','Natation',PISCINE,'','eau'],
+ ['mar','12h45','13h45','Natation',PISCINE,'','eau',OFF],
  ['mar','13h30','15h','Sports collectifs',CHENES,'','collectif'],
  ['mar','14h','16h','Auto-défense',CSU,'Dojo','combat',{bonus:true,sub:'« Confiance en soi »'}],
  ['mar','14h','16h','Football',MARADAS,'','collectif'],
@@ -285,7 +298,7 @@ const planning=[
  ['jeu','16h','17h','Escrime',CSU,'Salle de danse','combat',{sub:'Entraînement compétition'}],
  ['jeu','16h','18h','Escalade bloc',BLOCKOUT,'','nature',B],
  ['jeu','16h15','18h15','Badminton',MARADAS,'Gymnase','raquette'],
- ['jeu','17h','18h','Natation',PISCINE,'','eau'],
+ ['jeu','17h','18h','Natation',PISCINE,'','eau',OFF],
  ['jeu','17h','19h','Cheerleading',CSU,'Salle de danse','gym'],
  ['jeu','18h','20h','Rugby',MARADAS,'Extérieur','collectif',B],
  ['ven','10h','12h','Judo',CSU,'Dojo','combat',B],
@@ -294,11 +307,11 @@ const planning=[
  ['ven','12h','19h','Musculation',CSU,'Musculation','forme',{sub:'En accès libre'}],
  ['ven','12h30','13h30','Pump training',CSU,'Salle de danse','forme'],
  ['ven','12h30','13h30','Yoga',CSU,'Dojo','bienetre'],
- ['ven','12h45','13h45','Natation',PISCINE,'','eau'],
- ['ven','13h45','15h45','Natation sportive',PISCINE,'','eau'],
- ['ven','13h45','15h45','Formation SSA',PISCINE,'','eau'],
+ ['ven','12h45','13h45','Natation',PISCINE,'','eau',OFF],
+ ['ven','13h45','15h45','Natation sportive',PISCINE,'','eau',OFF],
+ ['ven','13h45','15h45','Formation SSA',PISCINE,'','eau',OFF],
  ['ven','14h','16h','Basket-ball',MARADAS,'Gymnase','collectif',B],
- ['ven','15h45','16h45','Natation',PISCINE,'','eau',{sub:'« Apprendre à nager »'}],
+ ['ven','15h45','16h45','Natation',AXE,'','eau',{sub:'« Apprendre à nager »',moved:true,note:'Déplacé : la Piscine du Parvis est fermée.'}],
  ['ven','16h30','18h30','Volley-ball',ESSEC,'','collectif',{sub:'Entraînement compétition'}],
  ['ven','17h','19h','MMA',CSU,'Dojo','combat'],
  ['ven','17h30','18h30','Zumba',CSU,'Salle de danse','forme'],
@@ -364,8 +377,8 @@ const items=places.map((p,i)=>{
 
 const sessions=planning.map(([day,start,end,sport,place,room,cat,opt],i)=>{
  const item=items[place],o=opt||{},where=[item.title,room].filter(Boolean).join(' · ');
- const s={id:i+1,day,time:start+'–'+end,sport,room,cat,item,where,sub:o.sub||'',note:o.note||'',bonus:!!o.bonus};
- s.hay=norm([sport,s.sub,days[day],cats[cat],where,item.p.address,o.bonus?'point bonus':''].join(' '));
+ const s={id:i+1,day,time:start+'–'+end,sport,room,cat,item,where,sub:o.sub||'',note:o.note||'',bonus:!!o.bonus,cancelled:!!o.cancelled,moved:!!o.moved};
+ s.hay=norm([sport,s.sub,days[day],cats[cat],where,item.p.address,o.bonus?'point bonus':'',o.cancelled?'annule':'',o.moved?'deplace':''].join(' '));
  return s;
 });
 items.forEach(it=>{it.sessions=sessions.filter(s=>s.item===it)});
@@ -397,7 +410,7 @@ function visibleSessions(){
 function otherPlaces(){return filtering()?[]:items.filter(it=>!it.sessions.length&&matches(it.hay))}
 function visible(){return [...new Set(visibleSessions().map(s=>s.item))].concat(otherPlaces())}
 function sessionRow(s,inPlace){
- const row=el('button','place'+(s.item.campus?' campus':''));row.type='button';
+ const row=el('button','place'+(s.item.campus?' campus':'')+(s.cancelled?' cancelled':''));row.type='button';
  if(!inPlace)row.appendChild(el('span','num',s.item.p.n));
  const text=el('span','place-text');
  text.appendChild(el('span','place-title',s.sport));
@@ -405,7 +418,7 @@ function sessionRow(s,inPlace){
  text.appendChild(el('span','place-sub',days[s.day]+' · '+s.time));
  if(!inPlace)text.appendChild(el('span','place-sub',s.where));
  row.appendChild(text);
- row.appendChild(s.bonus?el('span','bonus','Bonus'):el('span'));
+ row.appendChild(s.cancelled?el('span','bonus off','Annulé'):s.moved?el('span','bonus moved','Déplacé'):s.bonus?el('span','bonus','Bonus'):el('span'));
  row.addEventListener('click',()=>open(s.item,row,s));
  return row;
 }
@@ -460,6 +473,8 @@ function open(item,row,session){
  if(kicker)tw.appendChild(el('p','kicker',kicker));
  const h=el('h2',null,session?session.sport:item.title);h.tabIndex=-1;tw.appendChild(h);
  head.appendChild(tw);body.appendChild(head);
+ const alert=session&&session.cancelled?'Cours annulé : la Piscine du Parvis est fermée.':(!session&&item.alert);
+ if(alert){const n=el('div','notice');n.setAttribute('role','alert');n.appendChild(el('strong',null,alert));body.appendChild(n)}
  const dl=el('dl','facts');
  const fact=(k,v)=>{const d=el('div');d.appendChild(el('dt',null,k));const dd=el('dd');
   if(typeof v==='string')dd.textContent=v;else dd.appendChild(v);d.appendChild(dd);dl.appendChild(d)};
@@ -507,6 +522,7 @@ function close(){
 }
 
 q.addEventListener('input',()=>render(true));
+document.getElementById('poolMoved').addEventListener('click',e=>{const s=sessions.find(x=>x.moved);open(s.item,e.currentTarget,s)});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
 map.on('click',close);
 // Évite une vue mal cadrée si la carte n'a pas encore sa taille au chargement
